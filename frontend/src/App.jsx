@@ -24,7 +24,9 @@ import {
 } from "lucide-react";
 
 const STUDENT_ID = "S001";
-const API_BASE = "https://data-structure-teamproject-43m6.onrender.com/api/";
+const API_BASE = "https://data-structure-teamproject-43m6.onrender.com/api";
+const STUDENT_API = "https://data-structure-teamproject-43m6.onrender.com/api/students";
+const CURRICULUM_API = "https://data-structure-teamproject-43m6.onrender.com/api/curriculum";
 
 const categoryLabels = {
   MAJOR: "전공",
