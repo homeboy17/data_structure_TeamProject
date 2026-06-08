@@ -82,17 +82,31 @@ python cli.py recommend-semester S001 --year 1 --semester 2 --limit 10
 ## Web UI
 
 The web UI keeps the existing Python recommendation logic and SQLite database.
-Students can check completed courses, save them, and then see recommended
-courses calculated by `CurriculumRecommender`. It also shows graduation and
-teaching requirement status from `RequirementChecker`. The prerequisite graph
-screen visualizes course vertices and directed prerequisite edges with React
-Flow, highlighting completed and recommended courses for the current student.
-Non-course requirements are managed separately from completed courses. The
-web UI includes a dedicated non-course requirement screen where students can
-check completion, enter counts, and add optional notes. Saved non-course
-status is reflected by `RequirementChecker` in the requirement dashboard. The
-completed-course screen includes a sample reset button that restores `S001`
-to the seeded demo state, including non-course requirement progress.
+Students can edit the sample profile, check completed courses, save them, and
+then see recommended courses calculated by `CurriculumRecommender`. It also
+shows graduation and teaching requirement status from `RequirementChecker`.
+The prerequisite graph screen visualizes course vertices and directed
+prerequisite edges with React Flow, highlighting completed and recommended
+courses for the current student.
+
+### Student Profile Editing
+
+The web UI can edit the student's name, year, semester, and target track.
+Saved year and semester values are used by the recommendation score and can
+change recommendation ordering. The prerequisite DAG edges and edge weights
+remain fixed curriculum data and are not modified by student profile changes.
+
+### Non-Course Requirement Management
+
+Non-course requirements are managed separately from completed courses. They
+are stored in `student_non_course_records`, not in `completed_courses`. The web
+UI includes a dedicated non-course requirement screen where students can check
+completion, enter counts, and add optional notes. Saved non-course status is
+reflected by `RequirementChecker` in the requirement dashboard.
+
+The completed-course screen includes a sample reset button that restores
+`S001` to the seeded demo state, including profile fields, completed courses,
+and non-course requirement progress.
 
 Install backend dependencies:
 
@@ -129,6 +143,7 @@ Implemented API endpoints:
 ```text
 GET /api/courses
 GET /api/students/{student_id}
+PUT /api/students/{student_id}
 GET /api/students/{student_id}/completed
 PUT /api/students/{student_id}/completed
 GET /api/students/{student_id}/non-course-requirements
@@ -161,7 +176,7 @@ Recommendations for S001
 `S001` is seeded as a first-year, second-semester student on the `COMMON` track.
 Completed courses are `COM2002` and `COM2003`.
 Default non-course requirement records are seeded separately in
-`student_non_course_records` with zero progress.
+`student_non_course_records` with completed progress for the demo scenario.
 
 ## Branches
 

@@ -34,6 +34,8 @@ const categoryLabels = {
   non_course: "비교과",
 };
 
+const trackOptions = ["COMMON", "PROFESSIONAL", "TEACHER"];
+
 const nodeTypes = {
   course: memo(CourseNode),
 };
@@ -41,6 +43,8 @@ const nodeTypes = {
 function App() {
   const [activeView, setActiveView] = useState("completed");
   const [student, setStudent] = useState(null);
+  const [studentDraft, setStudentDraft] = useState(studentToDraft(null));
+  const [savedStudentDraft, setSavedStudentDraft] = useState(studentToDraft(null));
   const [courses, setCourses] = useState([]);
   const [selectedCourseIds, setSelectedCourseIds] = useState(new Set());
   const [savedCourseIds, setSavedCourseIds] = useState(new Set());
@@ -58,6 +62,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingStudent, setIsSavingStudent] = useState(false);
   const [isSavingNonCourse, setIsSavingNonCourse] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [message, setMessage] = useState("");
@@ -73,6 +78,10 @@ function App() {
   const hasNonCourseUnsavedChanges = !sameNonCourseDrafts(
     nonCourseDrafts,
     savedNonCourseDrafts,
+  );
+  const hasStudentUnsavedChanges = !sameStudentDrafts(
+    studentDraft,
+    savedStudentDraft,
   );
   const recommendedCourseIds = useMemo(
     () => new Set(recommendations.map((course) => course.course_id)),
@@ -114,9 +123,9 @@ function App() {
           requestJson(`/api/students/${STUDENT_ID}/requirements`),
           requestJson(`/api/students/${STUDENT_ID}/non-course-requirements`),
           requestJson("/api/graph"),
-        ]);
+      ]);
       const completedIds = new Set(completedData.map((course) => course.course_id));
-      setStudent(studentData);
+      applyStudentData(studentData);
       setCourses(coursesData);
       setSelectedCourseIds(completedIds);
       setSavedCourseIds(new Set(completedIds));
@@ -131,18 +140,37 @@ function App() {
     }
   }
 
+  async function saveStudentProfile() {
+    setIsSavingStudent(true);
+    setError("");
+    setMessage("");
+    try {
+      const updatedStudent = await requestJson(`/api/students/${STUDENT_ID}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: studentDraft.name,
+          current_year: Number(studentDraft.current_year),
+          current_semester: Number(studentDraft.current_semester),
+          track: studentDraft.target_track,
+        }),
+      });
+      applyStudentData(updatedStudent);
+      await refreshDerivedOutputs();
+      setSelectedGraphCourse(null);
+      setSelectedCourseRelations(null);
+      setMessage("학생 정보를 저장하고 추천 결과를 갱신했습니다.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSavingStudent(false);
+    }
+  }
+
   async function refreshRecommendations() {
     setIsRefreshing(true);
     setError("");
     try {
-      const [nextRecommendations, nextRequirements, nextNonCourse] = await Promise.all([
-        requestJson(`/api/students/${STUDENT_ID}/recommendations?limit=10`),
-        requestJson(`/api/students/${STUDENT_ID}/requirements`),
-        requestJson(`/api/students/${STUDENT_ID}/non-course-requirements`),
-      ]);
-      setRecommendations(nextRecommendations);
-      setRequirements(nextRequirements);
-      applyNonCourseItems(nextNonCourse.items);
+      await refreshDerivedOutputs();
       setMessage("추천 과목과 요건 요약을 갱신했습니다.");
     } catch (err) {
       setError(err.message);
@@ -159,6 +187,7 @@ function App() {
       const result = await requestJson(`/api/students/${STUDENT_ID}/reset-sample`, {
         method: "POST",
       });
+      applyStudentData(result.student);
       await syncStudentOutputs(result.completed_course_ids);
       setSelectedGraphCourse(null);
       setSelectedCourseRelations(null);
@@ -195,17 +224,31 @@ function App() {
   }
 
   async function syncStudentOutputs(completedCourseIds) {
-    const [nextRecommendations, nextRequirements, nextNonCourse] = await Promise.all([
-      requestJson(`/api/students/${STUDENT_ID}/recommendations?limit=10`),
-      requestJson(`/api/students/${STUDENT_ID}/requirements`),
-      requestJson(`/api/students/${STUDENT_ID}/non-course-requirements`),
-    ]);
+    const { nextRecommendations, nextRequirements, nextNonCourse } =
+      await fetchDerivedOutputs();
     const nextCompletedIds = new Set(completedCourseIds);
     setSelectedCourseIds(nextCompletedIds);
     setSavedCourseIds(new Set(nextCompletedIds));
     setRecommendations(nextRecommendations);
     setRequirements(nextRequirements);
     applyNonCourseItems(nextNonCourse.items);
+  }
+
+  async function refreshDerivedOutputs() {
+    const { nextRecommendations, nextRequirements, nextNonCourse } =
+      await fetchDerivedOutputs();
+    setRecommendations(nextRecommendations);
+    setRequirements(nextRequirements);
+    applyNonCourseItems(nextNonCourse.items);
+  }
+
+  async function fetchDerivedOutputs() {
+    const [nextRecommendations, nextRequirements, nextNonCourse] = await Promise.all([
+      requestJson(`/api/students/${STUDENT_ID}/recommendations?limit=10`),
+      requestJson(`/api/students/${STUDENT_ID}/requirements`),
+      requestJson(`/api/students/${STUDENT_ID}/non-course-requirements`),
+    ]);
+    return { nextRecommendations, nextRequirements, nextNonCourse };
   }
 
   async function saveNonCourseRequirements() {
@@ -231,10 +274,7 @@ function App() {
         },
       );
       applyNonCourseItems(result.items);
-      const nextRequirements = await requestJson(
-        `/api/students/${STUDENT_ID}/requirements`,
-      );
-      setRequirements(nextRequirements);
+      await refreshDerivedOutputs();
       setMessage("비교과 요건을 저장했고 요건 요약을 갱신했습니다.");
     } catch (err) {
       setError(err.message);
@@ -249,6 +289,24 @@ function App() {
     setNonCourseRequirements(nextItems);
     setNonCourseDrafts(drafts);
     setSavedNonCourseDrafts(drafts);
+  }
+
+  function applyStudentData(studentData) {
+    const draft = studentToDraft(studentData);
+    setStudent(studentData);
+    setStudentDraft(draft);
+    setSavedStudentDraft(draft);
+  }
+
+  function updateStudentDraft(field, value) {
+    setMessage("");
+    setStudentDraft((current) => ({
+      ...current,
+      [field]:
+        field === "current_year" || field === "current_semester"
+          ? Number(value)
+          : value,
+    }));
   }
 
   function updateNonCourseCompleted(key, completed) {
@@ -330,25 +388,18 @@ function App() {
           <p className="eyebrow">Curriculum Recommendation</p>
           <h1>이수 과목 기반 추천</h1>
         </div>
-        {student && (
-          <section className="student-summary" aria-label="학생 정보">
-            <div>
-              <span>학생</span>
-              <strong>{student.student_name ?? student.student_id}</strong>
-            </div>
-            <div>
-              <span>현재</span>
-              <strong>
-                {student.current_year}학년 {student.current_semester}학기
-              </strong>
-            </div>
-            <div>
-              <span>트랙</span>
-              <strong>{student.target_track ?? "-"}</strong>
-            </div>
-          </section>
-        )}
       </header>
+
+      {student && (
+        <StudentProfileCard
+          draft={studentDraft}
+          hasUnsavedChanges={hasStudentUnsavedChanges}
+          isSaving={isSavingStudent}
+          onChange={updateStudentDraft}
+          onSave={saveStudentProfile}
+          studentId={student.student_id}
+        />
+      )}
 
       {error && (
         <div className="alert error" role="alert">
@@ -603,6 +654,92 @@ function App() {
   );
 }
 
+function StudentProfileCard({
+  draft,
+  hasUnsavedChanges,
+  isSaving,
+  onChange,
+  onSave,
+  studentId,
+}) {
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSave();
+  }
+
+  return (
+    <section className="student-profile-card" aria-labelledby="student-profile-title">
+      <div className="student-profile-heading">
+        <div>
+          <p className="eyebrow">Student Profile</p>
+          <h2 id="student-profile-title">학생 정보</h2>
+        </div>
+        <span>{studentId}</span>
+      </div>
+
+      <form className="student-profile-form" onSubmit={handleSubmit}>
+        <label>
+          <span>이름</span>
+          <input
+            type="text"
+            value={draft.name}
+            onChange={(event) => onChange("name", event.target.value)}
+          />
+        </label>
+        <label>
+          <span>학년</span>
+          <select
+            value={draft.current_year}
+            onChange={(event) => onChange("current_year", event.target.value)}
+          >
+            {[1, 2, 3, 4].map((year) => (
+              <option key={year} value={year}>
+                {year}학년
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>학기</span>
+          <select
+            value={draft.current_semester}
+            onChange={(event) => onChange("current_semester", event.target.value)}
+          >
+            {[1, 2].map((semester) => (
+              <option key={semester} value={semester}>
+                {semester}학기
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>트랙</span>
+          <select
+            value={draft.target_track}
+            onChange={(event) => onChange("target_track", event.target.value)}
+          >
+            {trackOptions.map((track) => (
+              <option key={track} value={track}>
+                {track}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="primary-button" type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <Loader2 className="spin" size={18} aria-hidden="true" />
+          ) : (
+            <Save size={18} aria-hidden="true" />
+          )}
+          학생 정보 저장
+        </button>
+      </form>
+
+      {hasUnsavedChanges && <p className="profile-change-copy">저장 필요</p>}
+    </section>
+  );
+}
+
 function NonCourseRequirementsView({
   drafts,
   hasUnsavedChanges,
@@ -662,7 +799,7 @@ function NonCourseRequirementsView({
                       }
                     />
                     <span>
-                      <strong>{item.name}</strong>
+                      <strong className="non-course-title">{item.name}</strong>
                       <small>{item.recommended_timing ?? item.description ?? "-"}</small>
                     </span>
                   </label>
@@ -686,10 +823,12 @@ function NonCourseRequirementsView({
                   </div>
                 </label>
 
-                <div className="progress-track" aria-hidden="true">
-                  <span style={{ width: `${percent}%` }} />
+                <div className="non-course-progress-area">
+                  <div className="progress-track" aria-hidden="true">
+                    <span style={{ width: `${percent}%` }} />
+                  </div>
+                  <p className="progress-copy">진행률 {percent}%</p>
                 </div>
-                <p className="progress-copy">진행률 {percent}%</p>
 
                 <label className="non-course-note">
                   <span>메모</span>
@@ -1017,10 +1156,12 @@ function RequirementCardGroup({ badgeLabel, items, title }) {
             <p className="requirement-count">
               {item.completed} / {item.required} {item.unit}
             </p>
-            <div className="progress-track" aria-hidden="true">
-              <span style={{ width: `${item.progress_percent}%` }} />
+            <div className="requirement-progress-area">
+              <div className="progress-track" aria-hidden="true">
+                <span style={{ width: `${item.progress_percent}%` }} />
+              </div>
+              <p className="progress-copy">진행률 {item.progress_percent}%</p>
             </div>
-            <p className="progress-copy">진행률 {item.progress_percent}%</p>
           </article>
         ))}
       </div>
@@ -1152,6 +1293,35 @@ function sameSet(left, right) {
     }
   }
   return true;
+}
+
+function sameStudentDrafts(left, right) {
+  return (
+    normalizeStudentDraft(left).name === normalizeStudentDraft(right).name &&
+    normalizeStudentDraft(left).current_year ===
+      normalizeStudentDraft(right).current_year &&
+    normalizeStudentDraft(left).current_semester ===
+      normalizeStudentDraft(right).current_semester &&
+    normalizeStudentDraft(left).target_track === normalizeStudentDraft(right).target_track
+  );
+}
+
+function studentToDraft(student) {
+  return normalizeStudentDraft({
+    name: student?.student_name ?? "",
+    current_year: student?.current_year ?? 1,
+    current_semester: student?.current_semester ?? 1,
+    target_track: student?.target_track ?? "COMMON",
+  });
+}
+
+function normalizeStudentDraft(draft) {
+  return {
+    name: (draft?.name ?? "").trim(),
+    current_year: Number(draft?.current_year) || 1,
+    current_semester: Number(draft?.current_semester) || 1,
+    target_track: (draft?.target_track ?? "COMMON").trim().toUpperCase(),
+  };
 }
 
 function sameNonCourseDrafts(left, right) {

@@ -109,6 +109,60 @@ h1 {
   font-size: 0.98rem;
 }
 
+.student-profile-card {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid #d8dfdb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.student-profile-heading {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.student-profile-heading h2 {
+  margin-bottom: 0;
+  color: #17212b;
+  font-size: 1.25rem;
+}
+
+.student-profile-heading > span {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #e8f3ff;
+  color: #31566d;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.student-profile-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.3fr) repeat(3, minmax(120px, 0.7fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.student-profile-form label {
+  display: grid;
+  gap: 6px;
+  color: #526371;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.profile-change-copy {
+  margin: 10px 0 0;
+  color: #9a4d00;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
 .alert {
   display: flex;
   gap: 10px;
@@ -208,8 +262,9 @@ h1 {
 
 .requirement-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 10px;
+  align-items: stretch;
 }
 
 .requirement-group {
@@ -233,7 +288,9 @@ h1 {
 }
 
 .requirement-card {
-  min-height: 164px;
+  display: flex;
+  flex-direction: column;
+  min-height: 206px;
   padding: 14px;
   border: 1px solid #d9e1dd;
   border-radius: 8px;
@@ -253,9 +310,14 @@ h1 {
   gap: 10px;
   align-items: flex-start;
   justify-content: space-between;
+  min-height: 76px;
 }
 
-.requirement-card-title span {
+.requirement-card-title > div:first-child {
+  min-width: 0;
+}
+
+.requirement-card-title > div:first-child > span {
   display: block;
   margin-bottom: 2px;
   color: #687782;
@@ -268,6 +330,11 @@ h1 {
   color: #17212b;
   font-size: 1rem;
   line-height: 1.25;
+  display: -webkit-box;
+  min-height: 2.5em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .requirement-card-title strong {
@@ -310,6 +377,10 @@ h1 {
   color: #1f3241;
   font-size: 1.2rem;
   font-weight: 850;
+}
+
+.requirement-progress-area {
+  margin-top: auto;
 }
 
 .progress-track {
@@ -802,12 +873,14 @@ select {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 12px;
+  align-items: stretch;
 }
 
 .non-course-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  min-height: 240px;
+  min-height: 284px;
   padding: 14px;
   border: 1px solid #d9e1dd;
   border-radius: 8px;
@@ -828,6 +901,7 @@ select {
   gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
+  min-height: 76px;
 }
 
 .non-course-card-header label {
@@ -847,11 +921,21 @@ select {
 .non-course-card-header span {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
 .non-course-card-header strong {
   color: #17212b;
   overflow-wrap: anywhere;
+}
+
+.non-course-title {
+  display: -webkit-box;
+  min-height: 2.5em;
+  overflow: hidden;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .non-course-card-header small {
@@ -879,6 +963,10 @@ select {
   color: #526371;
   font-size: 0.88rem;
   font-weight: 800;
+}
+
+.non-course-progress-area {
+  margin-top: auto;
 }
 
 .non-course-value div {
@@ -1095,10 +1183,16 @@ select {
   }
 
   .student-summary,
+  .student-profile-form,
   .filters,
   .graph-layout,
   .prerequisite-list {
     grid-template-columns: 1fr;
+  }
+
+  .student-profile-heading,
+  .non-course-card-header {
+    flex-direction: column;
   }
 
   .graph-detail-card {

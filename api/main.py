@@ -33,6 +33,15 @@ class CompletedCoursesUpdate(BaseModel):
     course_ids: list[str] = Field(default_factory=list)
 
 
+class StudentUpdate(BaseModel):
+    name: Optional[str] = None
+    current_year: Optional[int] = None
+    current_semester: Optional[int] = None
+    year: Optional[int] = None
+    semester: Optional[int] = None
+    track: Optional[str] = None
+
+
 class NonCourseRequirementUpdate(BaseModel):
     key: str
     completed: bool = False
@@ -46,6 +55,11 @@ class NonCourseRequirementsUpdate(BaseModel):
 
 SAMPLE_STUDENT_ID = "S001"
 SAMPLE_COMPLETED_COURSES = ("COM2002", "COM2003")
+SAMPLE_STUDENT_NAME = "Sample Student"
+SAMPLE_CURRENT_YEAR = 1
+SAMPLE_CURRENT_SEMESTER = 2
+SAMPLE_TARGET_TRACK = "COMMON"
+ALLOWED_TRACKS = {"COMMON", "PROFESSIONAL", "TEACHER"}
 
 
 def get_db() -> Iterator[sqlite3.Connection]:
@@ -79,6 +93,37 @@ def get_student(
     return _student_response(_get_student_or_404(conn, student_id))
 
 
+@app.put("/api/students/{student_id}")
+def update_student(
+    student_id: str,
+    payload: StudentUpdate,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> dict[str, Any]:
+    _get_student_or_404(conn, student_id)
+    name, current_year, current_semester, target_track = _validated_student_update(
+        payload
+    )
+
+    try:
+        conn.execute(
+            """
+            UPDATE students
+            SET student_name = ?,
+                current_year = ?,
+                current_semester = ?,
+                target_track = ?
+            WHERE student_id = ?
+            """,
+            (name, current_year, current_semester, target_track, student_id),
+        )
+        conn.commit()
+    except sqlite3.DatabaseError:
+        conn.rollback()
+        raise
+
+    return _student_response(_get_student_or_404(conn, student_id))
+
+
 @app.get("/api/students/{student_id}/completed")
 def get_completed_courses(
     student_id: str,
@@ -102,6 +147,7 @@ def reset_sample_student(
     completed_courses = RequirementChecker(conn).get_completed_courses(student_id)
     return {
         "student_id": student_id,
+        "student": _student_response(_get_student_or_404(conn, student_id)),
         "completed_course_ids": [course["course_id"] for course in completed_courses],
         "completed_courses": completed_courses,
         "non_course_requirements": _non_course_requirements_response(student_id, conn)[
@@ -307,6 +353,43 @@ def _get_student_or_404(conn: sqlite3.Connection, student_id: str) -> dict[str, 
     return dict(row)
 
 
+def _validated_student_update(
+    payload: StudentUpdate,
+) -> tuple[str, int, int, str]:
+    name = (payload.name or "").strip()
+    current_year = (
+        payload.current_year
+        if payload.current_year is not None
+        else payload.year
+    )
+    current_semester = (
+        payload.current_semester
+        if payload.current_semester is not None
+        else payload.semester
+    )
+    target_track = (payload.track or "").strip().upper()
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Student name is required.")
+    if current_year not in {1, 2, 3, 4}:
+        raise HTTPException(
+            status_code=400,
+            detail="current_year must be one of 1, 2, 3, or 4.",
+        )
+    if current_semester not in {1, 2}:
+        raise HTTPException(
+            status_code=400,
+            detail="current_semester must be one of 1 or 2.",
+        )
+    if target_track not in ALLOWED_TRACKS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"track must be one of {', '.join(sorted(ALLOWED_TRACKS))}.",
+        )
+
+    return name, current_year, current_semester, target_track
+
+
 def _ensure_courses_exist(conn: sqlite3.Connection, course_ids: list[str]) -> None:
     if not course_ids:
         return
@@ -338,7 +421,13 @@ def _reset_sample_student(conn: sqlite3.Connection) -> None:
                 current_semester = excluded.current_semester,
                 target_track = excluded.target_track
             """,
-            (SAMPLE_STUDENT_ID, "Sample Student", 1, 2, "COMMON"),
+            (
+                SAMPLE_STUDENT_ID,
+                SAMPLE_STUDENT_NAME,
+                SAMPLE_CURRENT_YEAR,
+                SAMPLE_CURRENT_SEMESTER,
+                SAMPLE_TARGET_TRACK,
+            ),
         )
         conn.execute(
             "DELETE FROM completed_courses WHERE student_id = ?",
@@ -361,7 +450,7 @@ def _reset_sample_student(conn: sqlite3.Connection) -> None:
         )
         requirement_rows = conn.execute(
             """
-            SELECT requirement_id
+            SELECT requirement_id, required_count
             FROM non_course_requirements
             ORDER BY requirement_id
             """
@@ -374,7 +463,13 @@ def _reset_sample_student(conn: sqlite3.Connection) -> None:
                 )
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (SAMPLE_STUDENT_ID, row["requirement_id"], 0, 0, ""),
+                (
+                    SAMPLE_STUDENT_ID,
+                    row["requirement_id"],
+                    row["required_count"],
+                    1,
+                    "",
+                ),
             )
         conn.commit()
     except sqlite3.DatabaseError:

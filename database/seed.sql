@@ -228,11 +228,11 @@ INSERT INTO student_non_course_records (
     completed,
     note
 ) VALUES
-    ('S001', 'TEACHING_APTITUDE_CHARACTER', 0, 0, ''),
-    ('S001', 'CPR_TRAINING', 0, 0, ''),
-    ('S001', 'GENDER_SENSITIVITY_EDUCATION', 0, 0, ''),
-    ('S001', 'CRIMINAL_RECORD_CHECK', 0, 0, ''),
-    ('S001', 'DRUG_TEST', 0, 0, '')
+    ('S001', 'TEACHING_APTITUDE_CHARACTER', 2, 1, ''),
+    ('S001', 'CPR_TRAINING', 2, 1, ''),
+    ('S001', 'GENDER_SENSITIVITY_EDUCATION', 4, 1, ''),
+    ('S001', 'CRIMINAL_RECORD_CHECK', 1, 1, ''),
+    ('S001', 'DRUG_TEST', 1, 1, '')
 ON CONFLICT(student_id, requirement_id) DO UPDATE SET
     completed_count = excluded.completed_count,
     completed = excluded.completed,

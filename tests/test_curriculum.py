@@ -6,6 +6,7 @@ from curriculum.db import initialize_memory_database
 from curriculum.graph import has_cycle, load_graph, topological_sort
 from curriculum.recommender import CurriculumRecommender
 from curriculum.requirements import RequirementChecker
+from api.main import StudentUpdate, update_student
 
 
 class CurriculumRecommendationTest(unittest.TestCase):
@@ -153,7 +154,10 @@ class CurriculumRecommendationTest(unittest.TestCase):
     def test_non_course_requirements_are_checked(self) -> None:
         statuses = self.checker.check_non_course_requirements("S001")
         self.assertEqual(len(statuses), 5)
-        self.assertTrue(all(not status["satisfied"] for status in statuses))
+        self.assertTrue(all(status["satisfied"] for status in statuses))
+        self.assertTrue(
+            all(status["completed_count"] >= status["required_count"] for status in statuses)
+        )
 
     def test_non_course_completed_flag_satisfies_requirement(self) -> None:
         self.conn.execute(
@@ -192,6 +196,40 @@ class CurriculumRecommendationTest(unittest.TestCase):
         self.assertTrue(statuses["CPR_TRAINING"]["satisfied"])
         self.assertTrue(statuses["CPR_TRAINING"]["completed"])
 
+    def test_non_course_lower_count_can_be_unsatisfied(self) -> None:
+        self.conn.execute(
+            """
+            UPDATE student_non_course_records
+            SET completed = 0, completed_count = 1
+            WHERE student_id = 'S001'
+              AND requirement_id = 'CPR_TRAINING'
+            """
+        )
+        self.conn.commit()
+
+        statuses = {
+            status["requirement_id"]: status
+            for status in self.checker.check_non_course_requirements("S001")
+        }
+        self.assertFalse(statuses["CPR_TRAINING"]["satisfied"])
+        self.assertEqual(statuses["CPR_TRAINING"]["missing_count"], 1)
+
+    def test_student_profile_can_be_updated(self) -> None:
+        updated = update_student(
+            "S001",
+            StudentUpdate(
+                name="김재혁",
+                current_year=2,
+                current_semester=1,
+                track="TEACHER",
+            ),
+            self.conn,
+        )
+        self.assertEqual(updated["student_name"], "김재혁")
+        self.assertEqual(updated["current_year"], 2)
+        self.assertEqual(updated["current_semester"], 1)
+        self.assertEqual(updated["target_track"], "TEACHER")
+
     def test_requirement_summary_returns_missing_items_for_s001(self) -> None:
         summary = self.checker.get_requirement_summary("S001")
         missing_ids = {
@@ -201,7 +239,7 @@ class CurriculumRecommendationTest(unittest.TestCase):
         self.assertEqual(summary["student"]["student_id"], "S001")
         self.assertIn("BASIC_REQUIRED", missing_ids)
         self.assertIn("SUBJECT_EDUCATION", missing_ids)
-        self.assertIn("TEACHING_APTITUDE_CHARACTER", missing_ids)
+        self.assertNotIn("TEACHING_APTITUDE_CHARACTER", missing_ids)
 
 
 if __name__ == "__main__":
