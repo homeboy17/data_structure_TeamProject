@@ -23,6 +23,8 @@ import {
   Search,
 } from "lucide-react";
 
+import myLogo from "./logo.png";
+
 const STUDENT_ID = "S001";
 const API_BASE = "https://data-structure-teamproject-43m6.onrender.com";
 
