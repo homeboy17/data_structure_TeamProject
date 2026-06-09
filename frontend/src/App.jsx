@@ -393,6 +393,23 @@ function App() {
         </div>
       </header>
 
+      <div style={{
+        position: 'absolute',
+        top: '24px',
+        right: '24px',
+        zIndex: 1000
+      }}>
+        <img 
+          src={myLogo}
+          alt="상단 로고" 
+          style={{
+            width: '70px',
+            height: 'auto',
+            borderRadius: '6px'
+          }} 
+        />
+      </div>
+
       {student && (
         <StudentProfileCard
           draft={studentDraft}
