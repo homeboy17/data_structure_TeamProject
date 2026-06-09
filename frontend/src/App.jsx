@@ -403,7 +403,7 @@ function App() {
           src={myLogo}
           alt="상단 로고" 
           style={{
-            width: '70px',
+            width: '150px',
             height: 'auto',
             borderRadius: '6px'
           }} 
